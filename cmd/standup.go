@@ -138,24 +138,28 @@ func runGitLog(path string, since string) {
 
 		// Trim commit message
 
-		if len(message) > 50 {
-			message = message[:47] + "..."
+		if len(message) > 70 {
+			message = message[:67] + "..."
 		}
 
-		// ANSI Colors
-		// Cyan = hash
-		// White = message
-		// Yellow = date
-		// Green = author
+		hashWidth := 8
+		msgWidth := 70
+		dateWidth := 15
+		authorWidth := 15
 
-		colored := fmt.Sprintf(
-			"  \033[36m%s\033[0m  %s  \033[33m<%s>\033[0m  \033[32m%s\033[0m",
-			hash,
-			message,
-			date,
-			authorName,
+		if len(message) > msgWidth {
+			message = message[:msgWidth-3] + "..."
+		}
+
+		formatted := fmt.Sprintf(
+			"  \033[36m%-*s\033[0m  %-*s  \033[33m%-*s\033[0m  \033[32m%-*s\033[0m",
+			hashWidth, hash,
+			msgWidth, message,
+			dateWidth, date,
+			authorWidth, authorName,
 		)
-		fmt.Println(colored)
+
+		fmt.Println(formatted)
 	}
 
 }

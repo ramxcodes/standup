@@ -24,6 +24,9 @@ You’ll be prompted to pick where to install (e.g. `/opt/homebrew/bin`, `~/.loc
 curl -fsSL https://raw.githubusercontent.com/ramxcodes/standup/master/install.sh | sh
 ```
 
+- **Existing installs:** If standup is already installed in the chosen directory, it is removed and the latest release is installed.
+- **Weekly auto-update (optional):** When you run the installer interactively, you can opt in to weekly auto-update. A launchd job runs every Sunday at 3:00 AM and installs the latest release only if a new version exists. To disable: `launchctl unload ~/Library/LaunchAgents/com.standup.cli.update.plist`
+
 If the installer says **404** when downloading the binary, a release with binaries hasn’t been published yet. See [Creating a release](#creating-a-release) below.
 
 After install, run `standup` from any folder (open a new terminal or `source ~/.zshrc` if you used a custom path).

@@ -51,13 +51,13 @@ I've created XYZ yesterday and working on abc will try to comlete it today.
 ### Flags
 
 ```bash
-g standup 
-g standup -d <number> [can take days from current time, default is current time to last date]
-g standup -a <name> [filter logs by author, default is current author]
-g standup --set-api-key <string> [can set gemini api key]
-g standup --set-model-name <string> [can set model name]
-g standup --disable-ai
-g standup --enable-ai
-g standup -h or --help
-g standup -v or --version
+standup 
+standup -d <number> [can take days from current time, default is current time to last date]
+standup -a <name> [filter logs by author, default is current author]
+standup --set-api-key <string> [can set gemini api key]
+standup --set-model-name <string> [can set model name]
+standup --disable-ai
+standup --enable-ai
+standup -h or --help
+standup -v or --version
 ```

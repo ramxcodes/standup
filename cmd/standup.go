@@ -7,11 +7,16 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/ramxcodes/g-standup/internal/config"
 	"github.com/spf13/cobra"
 )
 
 var days int
 var author string
+var setAPIKey string
+var setModelName string
+var enableAI bool
+var disableAI bool
 
 var standupCmd = &cobra.Command{
 	Use:   "standup",
@@ -19,6 +24,42 @@ var standupCmd = &cobra.Command{
 	Long:  `Generate a standup-ready report from recent git commits. Supports filtering by days and author.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+
+		cfg, err := config.Load()
+		if err != nil {
+			fmt.Println("Error loading config:", err)
+			return
+		}
+
+		// Handle config update flags
+		if setAPIKey != "" {
+			cfg.APIKey = setAPIKey
+			config.Save(cfg)
+			fmt.Println("API key saved.")
+			return
+		}
+
+		if setModelName != "" {
+			cfg.ModelName = setModelName
+			config.Save(cfg)
+			fmt.Println("Model name updated.")
+			return
+		}
+
+		if enableAI {
+			cfg.AiEnabled = true
+			config.Save(cfg)
+			fmt.Println("AI enabled.")
+			return
+		}
+
+		if disableAI {
+			cfg.AiEnabled = false
+			config.Save(cfg)
+			fmt.Println("AI disabled.")
+			return
+		}
+
 		// Build since duration
 		since := fmt.Sprintf("%d days ago", days)
 
@@ -77,6 +118,33 @@ func init() {
 		"a",
 		"",
 		"Filter commits by author",
+	)
+
+	standupCmd.Flags().StringVar(
+		&setAPIKey,
+		"set-api-key",
+		"",
+		"Set Gemini API key",
+	)
+
+	standupCmd.Flags().StringVar(
+		&setModelName,
+		"set-model-name",
+		"",
+		"Set Gemini model name",
+	)
+
+	standupCmd.Flags().BoolVar(
+		&enableAI,
+		"enable-ai",
+		false,
+		"Enable AI summary",
+	)
+	standupCmd.Flags().BoolVar(
+		&disableAI,
+		"disable-ai",
+		false,
+		"Disable AI summary",
 	)
 }
 

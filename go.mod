@@ -1,4 +1,4 @@
-module github.com/ramxcodes/g-standup
+module github.com/ramxcodes/homebrew-standup
 
 go 1.25.1
 

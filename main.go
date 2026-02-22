@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/ramxcodes/g-standup/cmd"
+	"github.com/ramxcodes/homebrew-standup/cmd"
 )
 
 func main() {

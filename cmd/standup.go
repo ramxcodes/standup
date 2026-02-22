@@ -18,8 +18,6 @@ var standupCmd = &cobra.Command{
 	Long: `Generate a standup-ready report from recent git commits. Supports filtering by days and author.`,
 
 	Run: func(cmd *cobra.Command, args []string){
-		fmt.Println("Running Standup command...")
-		
 		// If author is empty, default to current git user
 		if author == "" {
 			author = getGitUser()
@@ -34,8 +32,8 @@ var standupCmd = &cobra.Command{
 			"git",
 			"log",
 			"--since="+since,
-			"--author"+author,
-			"--pretty=format:%h | %ad | %an | %s",
+			"--author="+author,
+			"--pretty=format:%h | %s | %ad | %an",
 			"--date=relative",
 		)
 
@@ -46,7 +44,6 @@ var standupCmd = &cobra.Command{
 		gitCmd.Stdout = &out
 
 		// Execute command
-
 		err := gitCmd.Run()
 		if err != nil{
 			fmt.Println("Error running git log:", err)
@@ -55,8 +52,8 @@ var standupCmd = &cobra.Command{
 
 		// Print raw git output
 
-		fmt.Println("\nCommits:\n")
-		fmt.Println(out.String())
+		fmt.Println("\nCommits:")
+		fmt.Println("\n",out.String())
 	},
 }
 

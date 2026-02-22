@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Install standup CLI on macOS (Apple Silicon or Intel).
-# Usage: curl -fsSL https://raw.githubusercontent.com/ramxcodes/standup/main/install.sh | sh
-# Or: curl -fsSL <url> | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/ramxcodes/standup/master/install.sh -o install.sh && sh install.sh
+# Or (non-interactive): curl -fsSL https://raw.githubusercontent.com/ramxcodes/standup/master/install.sh | sh
 
 set -e
 

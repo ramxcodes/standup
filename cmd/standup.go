@@ -5,12 +5,25 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ramxcodes/homebrew-standup/internal/ai"
 	"github.com/ramxcodes/homebrew-standup/internal/config"
 	"github.com/spf13/cobra"
+)
+
+const (
+	colorReset   = "\033[0m"
+	colorDim     = "\033[2m"
+	colorBold    = "\033[1m"
+	colorCyan    = "\033[36m"
+	colorYellow  = "\033[33m"
+	colorGreen   = "\033[32m"
+	colorMagenta = "\033[35m"
+	colorGray    = "\033[90m"
+	colorRed     = "\033[31m"
 )
 
 var days int
@@ -34,7 +47,7 @@ var standupCmd = &cobra.Command{
 func RunStandup(cmd *cobra.Command, args []string) {
 	cfg, err := config.Load()
 		if err != nil {
-			fmt.Println("Error loading config:", err)
+			fmt.Printf("%sError loading config: %v%s\n", colorRed, err, colorReset)
 			return
 		}
 
@@ -42,41 +55,40 @@ func RunStandup(cmd *cobra.Command, args []string) {
 		if setAPIKey != "" {
 			cfg.APIKey = setAPIKey
 			config.Save(cfg)
-			fmt.Println("API key saved.")
+			fmt.Printf("%sAPI key saved.%s\n", colorGreen, colorReset)
 			return
 		}
 
 		if setModelName != "" {
 			cfg.ModelName = setModelName
 			config.Save(cfg)
-			fmt.Println("Model name updated.")
+			fmt.Printf("%sModel name updated.%s\n", colorGreen, colorReset)
 			return
 		}
 
 		if enableAI {
 			cfg.AiEnabled = true
 			config.Save(cfg)
-			fmt.Println("AI enabled.")
+			fmt.Printf("%sAI enabled.%s\n", colorGreen, colorReset)
 			return
 		}
 
 		if disableAI {
 			cfg.AiEnabled = false
 			config.Save(cfg)
-			fmt.Println("AI disabled.")
+			fmt.Printf("%sAI disabled.%s\n", colorGreen, colorReset)
 			return
 		}
 
 		if showAPIKey {
 			if cfg.APIKey == "" {
-				fmt.Println("  No API key set.")
+				fmt.Printf("  %sNo API key set.%s\n", colorDim, colorReset)
 			} else {
-				// Mask middle, show last 4 for verification
 				k := cfg.APIKey
 				if len(k) <= 8 {
-					fmt.Println("  " + k)
+					fmt.Printf("  %s%s%s\n", colorCyan, k, colorReset)
 				} else {
-					fmt.Printf("  ****...%s\n", k[len(k)-4:])
+					fmt.Printf("  %s****...%s%s\n", colorDim, k[len(k)-4:], colorReset)
 				}
 			}
 			return
@@ -85,7 +97,13 @@ func RunStandup(cmd *cobra.Command, args []string) {
 		if removeAPIKey {
 			cfg.APIKey = ""
 			config.Save(cfg)
-			fmt.Println("  API key removed.")
+			fmt.Printf("  %sAPI key removed.%s\n", colorGreen, colorReset)
+			return
+		}
+
+		if cfg.AiEnabled && cfg.APIKey == "" {
+			fmt.Printf("%sAI is enabled but no API key is set.%s\n", colorYellow, colorReset)
+			fmt.Printf("%sSet one with %s--set-api-key <key>%s or disable AI with %s--disable-ai%s\n", colorDim, colorCyan, colorDim, colorCyan, colorReset)
 			return
 		}
 
@@ -102,10 +120,9 @@ func RunStandup(cmd *cobra.Command, args []string) {
 
 		// Check if current directory is a git repo
 		if isGitRepo(".") {
+			absPath, _ := filepath.Abs(".")
 			display, raw, has := runGitLog(".", since, authFilter)
-			for _, line := range display {
-				fmt.Println(line)
-			}
+			printRepoOutput(absPath, display, authFilter, has)
 			allRawLines = append(allRawLines, raw...)
 			if cfg.AiEnabled && cfg.APIKey != "" && has {
 				printAISummary(cfg, allRawLines)
@@ -116,36 +133,53 @@ func RunStandup(cmd *cobra.Command, args []string) {
 		// if not a repo -> scan direct subdirectories
 		entries, err := os.ReadDir(".")
 		if err != nil {
-			fmt.Println("Error reading directories:", err)
+			fmt.Printf("%sError reading directories: %v%s\n", colorGray, err, colorReset)
 			return
 		}
 
-		foundRepo := false
+		type repoResult struct {
+			absPath   string
+			display   []string
+			raw       []string
+			hasCommits bool
+		}
+		var noCommitRepos []string
+		var commitRepos []repoResult
+
 		for _, entry := range entries {
 			if entry.IsDir() {
 				path := entry.Name()
 				if isGitRepo(path) {
-					foundRepo = true
-					fmt.Printf("\n=== Repo: %s ===\n", path)
-					display, raw, _ := runGitLog(path, since, authFilter)
-					for _, line := range display {
-						fmt.Println(line)
+					absPath, _ := filepath.Abs(path)
+					display, raw, has := runGitLog(path, since, authFilter)
+					if !has {
+						noCommitRepos = append(noCommitRepos, absPath)
+					} else {
+						commitRepos = append(commitRepos, repoResult{absPath, display, raw, has})
+						allRawLines = append(allRawLines, raw...)
 					}
-					allRawLines = append(allRawLines, raw...)
 				}
 			}
 		}
 
-		if !foundRepo {
-			fmt.Println("(Oopsie Daisy) No git repos found in current directory!")
+		if len(noCommitRepos) == 0 && len(commitRepos) == 0 {
+			fmt.Printf("%s(Oopsie Daisy) No git repos found in current directory!%s\n", colorYellow, colorReset)
 			return
+		}
+
+		// Show no-commit repos first, then repos with commits
+		for _, absPath := range noCommitRepos {
+			printRepoOutput(absPath, nil, authFilter, false)
+		}
+		for _, r := range commitRepos {
+			printRepoOutput(r.absPath, r.display, authFilter, true)
 		}
 
 		if cfg.AiEnabled && cfg.APIKey != "" && len(allRawLines) > 0 {
 			fmt.Println()
 			printAISummary(cfg, allRawLines)
 		}
-}
+	}
 
 func init() {
 	rootCmd.AddCommand(standupCmd)
@@ -230,6 +264,21 @@ Global Flags:
 	)
 }
 
+func printRepoOutput(absPath string, display []string, authorName string, hasCommits bool) {
+	fmt.Printf("%s%s%s\n", colorMagenta, absPath, colorReset)
+	if !hasCommits {
+		who := authorName
+		if who == "" {
+			who = "you"
+		}
+		fmt.Printf("%sNo commits from %s during this period.%s\n", colorDim, who, colorReset)
+		return
+	}
+	for _, line := range display {
+		fmt.Println(line)
+	}
+}
+
 func isGitRepo(path string) bool {
 	cmd := exec.Command("git", "-C", path, "rev-parse", "--is-inside-work-tree")
 	err := cmd.Run()
@@ -247,6 +296,7 @@ func getDefaultAuthor(repoPath string) string {
 }
 
 // runGitLog returns (display lines for terminal, raw lines for AI, hasCommits).
+// When no commits: display is nil. Format: "hash - message (date) <author>" with colors.
 func runGitLog(path, since, authorFilter string) (display []string, raw []string, hasCommits bool) {
 	args := []string{
 		"-C", path,
@@ -264,20 +314,15 @@ func runGitLog(path, since, authorFilter string) (display []string, raw []string
 	cmd.Stdout = &out
 
 	if err := cmd.Run(); err != nil {
-		return []string{"  No commits found."}, nil, false
+		return nil, nil, false
 	}
 
 	output := strings.TrimSpace(out.String())
 	if output == "" {
-		return []string{"  No commits found."}, nil, false
+		return nil, nil, false
 	}
 
 	lines := strings.Split(output, "\n")
-	hashWidth := 8
-	msgWidth := 70
-	dateWidth := 15
-	authorWidth := 15
-
 	for _, line := range lines {
 		parts := strings.Split(line, " | ")
 		if len(parts) != 4 {
@@ -289,14 +334,12 @@ func runGitLog(path, since, authorFilter string) (display []string, raw []string
 		message := parts[1]
 		date := parts[2]
 		authorName := parts[3]
-		if len(message) > msgWidth {
-			message = message[:msgWidth-3] + "..."
-		}
 
-		formatted := fmt.Sprintf(
-			"  \033[36m%-*s\033[0m  %-*s  \033[33m%-*s\033[0m  \033[32m%-*s\033[0m",
-			hashWidth, hash, msgWidth, message, dateWidth, date, authorWidth, authorName,
-		)
+		formatted := fmt.Sprintf("%s%s%s - %s (%s%s%s) %s<%s>%s",
+			colorCyan, hash, colorReset,
+			message,
+			colorYellow, date, colorReset,
+			colorGreen, authorName, colorReset)
 		display = append(display, formatted)
 	}
 
@@ -320,7 +363,7 @@ func runWithLoader(msg string, fn func() (string, error)) (string, error) {
 			return result, err
 		default:
 			frame := spinnerFrames[i%len(spinnerFrames)]
-			fmt.Printf("\r  %s %s  ", msg, frame)
+			fmt.Printf("\r  %s%s %s%s  ", colorCyan, msg, frame, colorReset)
 			i++
 			time.Sleep(80 * time.Millisecond)
 		}
@@ -339,13 +382,12 @@ Commits:
 	})
 
 	if err != nil {
-		fmt.Printf("  \033[31mAI summary failed: %v\033[0m\n", err)
+		fmt.Printf("  %sAI summary failed: %v%s\n", colorRed, err, colorReset)
 		return
 	}
 
 	summary = strings.TrimSpace(summary)
-	fmt.Println("\033[1mAI GENERATED SUMMARY -\033[0m")
-	fmt.Println()
+	fmt.Printf("\n%s%sAI GENERATED SUMMARY%s%s\n\n", colorBold, colorCyan, colorReset, colorBold)
 	fmt.Println("  " + summary)
 	fmt.Println()
 }

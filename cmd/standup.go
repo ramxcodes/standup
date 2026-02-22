@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
@@ -18,42 +19,40 @@ var standupCmd = &cobra.Command{
 	Long: `Generate a standup-ready report from recent git commits. Supports filtering by days and author.`,
 
 	Run: func(cmd *cobra.Command, args []string){
-		// If author is empty, default to current git user
-		if author == "" {
-			author = getGitUser()
-		}
-
 		// Build since duration
 		since := fmt.Sprintf("%d days ago", days)
 
-		// Preprare git command
-
-		gitCmd := exec.Command(
-			"git",
-			"log",
-			"--since="+since,
-			"--author="+author,
-			"--pretty=format:%h | %s | %ad | %an",
-			"--date=relative",
-		)
-
-
-		// Buffer to capture output
-
-		var out bytes.Buffer
-		gitCmd.Stdout = &out
-
-		// Execute command
-		err := gitCmd.Run()
-		if err != nil{
-			fmt.Println("Error running git log:", err)
+		// Check if current directory is a git repo
+		if isGitRepo("."){
+			runGitLog(".", since)
 			return
 		}
 
-		// Print raw git output
+		// if not a repo -> scan direct subdirectories
 
-		fmt.Println("\nCommits:")
-		fmt.Println("\n",out.String())
+		entries, err := os.ReadDir(".")
+		if err != nil{
+			fmt.Println("Error reading directories:", err)
+			return
+		}
+
+		foundRepo := false
+
+		for _, entry := range entries{
+			if entry.IsDir(){
+				path := entry.Name()
+
+				if isGitRepo(path){
+					foundRepo = true
+					fmt.Printf("\n=== Repo: %s ===\n", path)
+					runGitLog(path,since)
+				}
+			}
+		}
+
+		if !foundRepo{
+			fmt.Println("(Oopsie Daisy) No git repos found in current directory!")
+		}
 	},
 }
 
@@ -94,4 +93,40 @@ func getGitUser() string {
 	}
 
 	return string(bytes.TrimSpace(out.Bytes()))
+}
+
+func isGitRepo(path string) bool {
+	cmd := exec.Command("git", "-C", path, "rev-parse", "--is-inside-work-tree")
+
+	err := cmd.Run()
+	return err == nil
+}
+
+func runGitLog (path string, since string){
+
+	args := []string{
+		"-C", path,
+		"log",
+		"--since=" + since,
+		"--pretty=format:%h | %s | %ad | %an",
+		"--date=relative",
+	}
+
+	if author != ""{
+		args = append(args, "--author="+author)
+	}
+
+	cmd := exec.Command("git", args...)
+
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	
+
+	err := cmd.Run()
+	if err != nil{
+		fmt.Println("No Commits found.")
+		return
+	}
+
+	fmt.Println(out.String())
 }
